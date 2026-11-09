@@ -1,0 +1,18 @@
+# Sorties de build (le .dmg est publié en Release GitHub, pas commité)
+Croquis.app/
+dist/
+*.dmg
+*.zip
+icon.iconset/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+.AppleDouble
+._*
+
+# Les réglages de l'app sont dans ~/Library/Application Support/Croquis (jamais dans le dépôt)
