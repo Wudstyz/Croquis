@@ -29,11 +29,11 @@ The app is **self-contained** (Python and libraries are inside): drag it to *App
 
 | Option | Effect |
 |---|---|
-| **Outlines** | Black line around shapes. *Clean outlines* (coloring-book style) or *Pencil* (soft sketch). Settings: level of detail, amount of lines, noise smoothing, thickness, take colors into account. |
-| **Shadows as hatching** | Dark areas become hatching (up to 4 crossed layers: the deeper the shadow, the more layers) or small dots. Settings: amount of shadow, spacing, thickness, angle, shadow grouping. |
+| **Outlines** | Black line around shapes. *Clean outlines* (coloring-book style) or *Pencil* (soft sketch). Smooth, continuous lines of even thickness. Settings: level of detail, amount of lines, noise smoothing, thickness, line fluidity, take colors into account. |
+| **Shadows as hatching** | Dark areas become parallel hatching whose strokes get thicker with the shadow (so no grid pattern; crossed hatching is available as an option) or small dots. Settings: amount of shadow, spacing, thickness, angle, shadow grouping. |
 | **Solid blacks** | Very dark areas (pupils, deep shadows) are filled with solid black. |
 | **Cleanup** | Erases small specks and isolated strokes (photo grain, artifacts). |
-| **Image and background** | Automatic contrast correction, transparent background (PNG), negative (white lines on black). |
+| **Image and background** | **Pure black and white** (no gray at all: every dot is black or white, on by default), automatic contrast correction, transparent background (PNG), negative (white lines on black). |
 | **Presets** | Coloriage, For kids, Detailed, Hatched sketch, Comic book, Pencil, Engraving, Dot pattern. |
 
 Everything updates **live**: *Result*, *Original*, *Compare* (sliding divider) or *Side by side*, with zoom.
@@ -59,7 +59,7 @@ A full example is in [`examples/`](examples): the original image, its coloring p
 
 ## Installation
 
-1. Download `Croquis-1.0-macOS-arm64.dmg` from the [releases page](https://github.com/Wudstyz/Croquis/releases/latest), open it and drag **Croquis** into **Applications**.
+1. Download `Croquis-1.1-macOS-arm64.dmg` from the [releases page](https://github.com/Wudstyz/Croquis/releases/latest), open it and drag **Croquis** into **Applications**.
 2. **First launch**: the app is ad-hoc signed (no paid Apple developer account, so no notarization). macOS asks for a one-time confirmation:
    - **right-click Croquis → Open → Open**, or
    - in Terminal: `xattr -dr com.apple.quarantine /Applications/Croquis.app`
@@ -88,7 +88,7 @@ You need the Xcode command-line tools (`clang`, `codesign`, `hdiutil`). The scri
 
 ```bash
 ./build_app.sh     # builds Croquis.app (≈ 115 MB)
-./make_dmg.sh      # builds dist/Croquis-1.0-macOS-arm64.dmg and prints its SHA-256
+./make_dmg.sh      # builds dist/Croquis-1.1-macOS-arm64.dmg and prints its SHA-256
 ```
 
 Run without building (with a Python 3.14 that has `pywebview pillow numpy scipy pyobjc-framework-Cocoa`): `python app.py`.

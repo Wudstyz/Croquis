@@ -2,7 +2,7 @@
 # Construit « Croquis.app » : application autonome (Python embarqué, aucune installation requise).
 # Python = « python-build-standalone » (astral-sh), téléchargé une fois et vérifié par SHA-256.
 # Le même fichier sert pour Croquis et pour Atelier Traceuse (cache partagé : pas de second téléchargement).
-APPNAME="Croquis"; EXE="Croquis"; VERSION="1.0"
+APPNAME="Croquis"; EXE="Croquis"; VERSION="1.1"
 PBS_TAG="20261026"
 PBS_FILE="cpython-3.14.10+${PBS_TAG}-aarch64-apple-darwin-install_only_stripped.tar.gz"
 PBS_SHA="95eb8c87d16af37c54e9765e31d8c56c0d8ffa9968ea0f704f73a9b83f84e9f9"

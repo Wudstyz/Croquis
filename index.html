@@ -190,12 +190,13 @@ const SCHEMA = [
     {t: "range", key: "lines.amount", label: "Quantité de traits", min: 0, max: 100, step: 1, tip: "Plus c'est haut, plus on garde de contours discrets."},
     {t: "range", key: "lines.smoothing", label: "Lissage du bruit", min: 0, max: 100, step: 1, tip: "Réduit les petits parasites d'une photo (grain, texture)."},
     {t: "range", key: "lines.thickness", label: "Épaisseur du trait", min: -2, max: 8, step: .1, fmt: fmt1, tip: "Négatif = traits plus fins, positif = traits plus épais."},
+    {t: "range", key: "lines.fluid", label: "Fluidité des traits", min: 0, max: 100, step: 1, tip: "Plus c'est haut, plus les courbes sont lisses et arrondies, et plus les petits traits voisins fusionnent."},
     {t: "chk", key: "lines.useColors", label: "Tenir compte des couleurs", tip: "Détecte aussi les contours entre deux couleurs de même clarté."},
   ]},
   {id: "shading", title: "Ombres en hachures", color: "var(--violet)", toggle: "shading.enabled", controls: [
     {t: "seg", key: "shading.style", opts: [["hatching", "Hachures"], ["dots", "Points"]]},
     {t: "range", key: "shading.amount", label: "Quantité d'ombres", min: 0, max: 100, step: 1, tip: "Plus c'est haut, plus de zones sont ombrées."},
-    {t: "range", key: "shading.layers", label: "Couches (hachures croisées)", min: 1, max: 4, step: 1, showIf: S => S.shading.style === "hatching", tip: "Plus c'est sombre, plus on ajoute de couches croisées."},
+    {t: "range", key: "shading.layers", label: "Hachures croisées (1 = sans quadrillage)", min: 1, max: 4, step: 1, showIf: S => S.shading.style === "hatching", tip: "1 = une seule direction, le noir s'épaissit dans les ombres. Plus haut : on croise des hachures dans les zones très sombres (effet quadrillage)."},
     {t: "range", key: "shading.spacing", label: "Écart entre les traits", min: 2, max: 16, step: .5, fmt: fmt1},
     {t: "range", key: "shading.lineWidth", label: "Épaisseur des hachures", min: .3, max: 3, step: .1, fmt: fmt1, showIf: S => S.shading.style === "hatching"},
     {t: "range", key: "shading.angle", label: "Angle", min: 0, max: 180, step: 5, fmt: v => v + "°"},
@@ -209,6 +210,7 @@ const SCHEMA = [
     {t: "range", key: "cleanup.size", label: "Taille des taches à effacer", min: 0, max: 100, step: 1, tip: "Efface les petits points et traits isolés."},
   ]},
   {id: "output", title: "Image et fond", color: "#bbb", controls: [
+    {t: "chk", key: "output.pure", label: "Noir et blanc pur, sans aucun gris", tip: "Chaque point du dessin est soit noir, soit blanc : idéal pour imprimer et colorier. Désactiver pour garder des bords adoucis."},
     {t: "chk", key: "output.autoContrast", label: "Corriger le contraste automatiquement", tip: "Utile pour les photos ternes ou trop sombres."},
     {t: "chk", key: "output.transparent", label: "Fond transparent (PNG)", tip: "Le fond blanc devient transparent : on ne garde que les traits."},
     {t: "chk", key: "output.negative", label: "Inverser : traits blancs sur fond noir"},
@@ -216,12 +218,12 @@ const SCHEMA = [
 ];
 const PRESETS = [
   {n: "Coloriage", d: "Contours simples et propres", p: {}},
-  {n: "Pour enfant", d: "Gros traits, très peu de détails", p: {lines: {detail: 28, amount: 55, smoothing: 60, thickness: 3.2}, cleanup: {size: 60}}},
-  {n: "Détaillé", d: "Beaucoup de détails, traits fins", p: {lines: {detail: 80, amount: 72, smoothing: 25, thickness: .2}, cleanup: {size: 18}}},
-  {n: "Croquis hachuré", d: "Contours + ombres en hachures", p: {shading: {enabled: true, layers: 3, amount: 55}, lines: {thickness: .6}}},
-  {n: "Bande dessinée", d: "Traits épais, noirs pleins, hachures", p: {lines: {thickness: 2.2, amount: 58}, solid: {enabled: true, threshold: 16}, shading: {enabled: true, layers: 2, amount: 42, lineWidth: 1.2}}},
+  {n: "Pour enfant", d: "Gros traits, très peu de détails", p: {lines: {detail: 28, amount: 55, smoothing: 60, thickness: 3.2, fluid: 70}, cleanup: {size: 60}}},
+  {n: "Détaillé", d: "Beaucoup de détails, traits fins", p: {lines: {detail: 80, amount: 72, smoothing: 25, thickness: .2, fluid: 15}, cleanup: {size: 18}}},
+  {n: "Croquis hachuré", d: "Contours + ombres en hachures", p: {shading: {enabled: true, layers: 1, amount: 55}, lines: {thickness: .6}}},
+  {n: "Bande dessinée", d: "Traits épais, noirs pleins, hachures", p: {lines: {thickness: 2.2, amount: 58}, solid: {enabled: true, threshold: 16}, shading: {enabled: true, layers: 1, amount: 42, lineWidth: 1.2}}},
   {n: "Crayon", d: "Esquisse douce au crayon", p: {lines: {style: "pencil", detail: 60, amount: 55, thickness: 0}}},
-  {n: "Gravure", d: "Fines hachures croisées", p: {lines: {thickness: 0, amount: 45}, shading: {enabled: true, layers: 4, spacing: 4, lineWidth: .8, amount: 70, smoothing: 55}}},
+  {n: "Gravure", d: "Fines hachures serrées", p: {lines: {thickness: 0, amount: 45}, shading: {enabled: true, layers: 1, spacing: 3.6, lineWidth: .9, amount: 70, smoothing: 55}}},
   {n: "Trame de points", d: "Ombres en petits points", p: {lines: {thickness: .8}, shading: {enabled: true, style: "dots", spacing: 6, amount: 65}}},
 ];
 const preserveOut = o => o.output;

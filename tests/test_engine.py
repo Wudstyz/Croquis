@@ -59,7 +59,7 @@ class EngineTests(unittest.TestCase):
         self.assertGreater(float(with_cleanup[300 - 190:300 - 170, 300].max()), 0.5)   # le disque est gardé
 
     def test_thickness_changes_amount_of_ink(self):
-        src = engine.Source(disc_image())
+        src = engine.Source(disc_image(1000, 300))
         thin = engine.render(src, settings(lines={"thickness": -1.0})).sum()
         base = engine.render(src, settings(lines={"thickness": 0.0})).sum()
         fat = engine.render(src, settings(lines={"thickness": 4.0})).sum()
@@ -79,7 +79,7 @@ class EngineTests(unittest.TestCase):
         src = engine.Source(np.full((n, n, 3), 25, np.uint8))
         a = engine.render(src, settings(lines={"enabled": False}, shading={"enabled": True, "layers": 1}, output={"autoContrast": False})).mean()
         b = engine.render(src, settings(lines={"enabled": False}, shading={"enabled": True, "layers": 4}, output={"autoContrast": False})).mean()
-        self.assertGreater(b, a * 1.5)
+        self.assertGreater(b, a * 1.1)
 
     def test_solid_fills_very_dark_areas(self):
         img = np.full((400, 400, 3), 230, np.uint8)
@@ -92,9 +92,33 @@ class EngineTests(unittest.TestCase):
     def test_preview_and_full_size_look_the_same(self):
         rgb = sample.make_sample()
         s = settings(shading={"enabled": True})
-        small = engine.render(engine.Source(engine.resize_rgb(rgb, 600)), s).mean()
-        big = engine.render(engine.Source(engine.resize_rgb(rgb, 1200)), s).mean()
+        small = engine.render(engine.Source(engine.resize_rgb(rgb, 1000)), s).mean()
+        big = engine.render(engine.Source(engine.resize_rgb(rgb, 2000)), s).mean()
         self.assertLess(abs(small - big) / big, 0.2, f"quantité d'encre différente : {small:.3f} vs {big:.3f}")
+
+    def test_pure_mode_is_strictly_black_and_white(self):
+        """Aucun gris : chaque pixel est 0 ou 255, quels que soient les effets activés."""
+        rgb = sample.make_sample()
+        src = engine.Source(engine.resize_rgb(rgb, 700))
+        for s in (settings(), settings(shading={"enabled": True, "layers": 4}), settings(shading={"enabled": True, "style": "dots"}, solid={"enabled": True}),
+                  settings(lines={"style": "pencil"}), settings(lines={"fluid": 100, "thickness": 5})):
+            vals = set(np.unique(np.asarray(engine.to_image(engine.render(src, s)))).tolist())
+            self.assertTrue(vals <= {0, 255}, f"niveaux de gris trouvés : {sorted(vals)[:6]}")
+            self.assertEqual(vals, {0, 255})                                 # il y a bien du noir ET du blanc
+        alpha = np.asarray(engine.to_image(engine.render(src, settings()), transparent=True))[..., 3]
+        self.assertTrue(set(np.unique(alpha).tolist()) <= {0, 255})
+        soft = engine.render(src, settings(output={"pure": False}))
+        self.assertGreater(len(np.unique(soft)), 2)                          # l'option peut être désactivée
+
+    def test_cross_hatching_does_not_make_a_grid_everywhere(self):
+        """Les hachures croisées n'apparaissent que dans les zones très sombres."""
+        n = 1000
+        mid = engine.Source(np.full((n, n, 3), 110, np.uint8))              # gris moyen : une seule direction
+        dark = engine.Source(np.full((n, n, 3), 20, np.uint8))               # très sombre : deux directions
+        s = settings(lines={"enabled": False}, shading={"enabled": True, "layers": 2, "amount": 80}, output={"autoContrast": False})
+        a, b = engine.render(mid, s).mean(), engine.render(dark, s).mean()
+        self.assertGreater(a, 0.05)
+        self.assertGreater(b, a * 1.4)
 
     def test_bad_settings_never_crash(self):
         for bad in (None, 5, "x", {"lines": 3}, {"lines": {"detail": "abc", "thickness": 1e99, "style": "zzz"}},

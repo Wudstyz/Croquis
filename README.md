@@ -27,11 +27,11 @@ L'app est **autonome** (Python et bibliothèques sont dedans) : on la glisse dan
 
 | Option | Effet |
 |---|---|
-| **Contours** | Trait noir autour des formes. *Contours nets* (style coloriage) ou *Crayon* (esquisse douce). Réglages : niveau de détail, quantité de traits, lissage du bruit, épaisseur, prise en compte des couleurs. |
-| **Ombres en hachures** | Les zones sombres deviennent des hachures (jusqu'à 4 couches croisées : plus l'ombre est profonde, plus il y en a) ou des petits points. Réglages : quantité d'ombres, écart, épaisseur, angle, regroupement des ombres. |
+| **Contours** | Trait noir autour des formes. *Contours nets* (style coloriage) ou *Crayon* (esquisse douce). Traits lisses, continus et d'épaisseur régulière. Réglages : niveau de détail, quantité de traits, lissage du bruit, épaisseur, fluidité des traits, prise en compte des couleurs. |
+| **Ombres en hachures** | Les zones sombres deviennent des hachures parallèles dont le trait s'épaissit avec l'ombre (donc pas de quadrillage ; des hachures croisées restent possibles en option) ou des petits points. Réglages : quantité d'ombres, écart, épaisseur, angle, regroupement des ombres. |
 | **Aplats noirs** | Les zones très sombres (pupilles, ombres profondes) sont remplies en noir. |
 | **Nettoyage** | Efface les petits points et traits isolés (grain d'une photo, parasites). |
-| **Image et fond** | Correction automatique du contraste, fond transparent (PNG), négatif (traits blancs sur noir). |
+| **Image et fond** | **Noir et blanc pur** (aucun gris : chaque point est noir ou blanc, activé par défaut), correction automatique du contraste, fond transparent (PNG), négatif (traits blancs sur noir). |
 | **Préréglages** | Coloriage, Pour enfant, Détaillé, Croquis hachuré, Bande dessinée, Crayon, Gravure, Trame de points. |
 
 Tout se voit **en temps réel** : *Résultat*, *Original*, *Comparer* (curseur glissant) ou *Côte à côte*, avec zoom.
@@ -57,7 +57,7 @@ Un exemple complet est dans [`examples/`](examples) : l'image d'origine, son col
 
 ## Installation
 
-1. Télécharger `Croquis-1.0-macOS-arm64.dmg` depuis la [page des versions](https://github.com/Wudstyz/Croquis/releases/latest), l'ouvrir, puis glisser **Croquis** dans **Applications**.
+1. Télécharger `Croquis-1.1-macOS-arm64.dmg` depuis la [page des versions](https://github.com/Wudstyz/Croquis/releases/latest), l'ouvrir, puis glisser **Croquis** dans **Applications**.
 2. **Première ouverture** : l'app est signée « ad hoc » (pas de compte développeur Apple payant, donc pas de notarisation). macOS demande une confirmation une seule fois :
    - **clic droit sur Croquis → Ouvrir → Ouvrir**, ou
    - dans le Terminal : `xattr -dr com.apple.quarantine /Applications/Croquis.app`
@@ -86,7 +86,7 @@ Il faut les outils en ligne de commande de Xcode (`clang`, `codesign`, `hdiutil`
 
 ```bash
 ./build_app.sh     # fabrique Croquis.app (≈ 115 Mo)
-./make_dmg.sh      # fabrique dist/Croquis-1.0-macOS-arm64.dmg et affiche sa somme SHA-256
+./make_dmg.sh      # fabrique dist/Croquis-1.1-macOS-arm64.dmg et affiche sa somme SHA-256
 ```
 
 Lancer sans construire (avec un Python 3.14 qui a `pywebview pillow numpy scipy pyobjc-framework-Cocoa`) : `python app.py`.

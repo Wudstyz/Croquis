@@ -24,17 +24,17 @@ Image.MAX_IMAGE_PIXELS = 250_000_000
 
 DEFAULTS = {
     "lines": {"enabled": True, "style": "contours", "detail": 55, "amount": 50, "smoothing": 35,
-              "thickness": 1.2, "useColors": True},
-    "shading": {"enabled": False, "style": "hatching", "amount": 55, "layers": 3, "spacing": 5.0,
+              "thickness": 1.2, "fluid": 40, "useColors": True},
+    "shading": {"enabled": False, "style": "hatching", "amount": 55, "layers": 1, "spacing": 5.0,
                 "lineWidth": 1.0, "angle": 45, "variableWidth": True, "smoothing": 40},
     "solid": {"enabled": False, "threshold": 18},
     "cleanup": {"enabled": True, "size": 30},
-    "output": {"autoContrast": True, "transparent": False, "negative": False},
+    "output": {"autoContrast": True, "pure": True, "transparent": False, "negative": False},
 }
 
 RANGES = {
     ("lines", "detail"): (0, 100), ("lines", "amount"): (0, 100), ("lines", "smoothing"): (0, 100),
-    ("lines", "thickness"): (-2.0, 8.0),
+    ("lines", "thickness"): (-2.0, 8.0), ("lines", "fluid"): (0, 100),
     ("shading", "amount"): (0, 100), ("shading", "layers"): (1, 4), ("shading", "spacing"): (2.0, 16.0),
     ("shading", "lineWidth"): (0.3, 3.0), ("shading", "angle"): (0, 180), ("shading", "smoothing"): (0, 100),
     ("solid", "threshold"): (0, 100), ("cleanup", "size"): (0, 100),
@@ -232,6 +232,87 @@ def _contour_dog(src, L, auto):
     return src.memo(key, calc)
 
 
+def _sign_change_pixels(D):
+    """Pixels situés juste au milieu d'un bord : là où D change de signe entre deux voisins, on garde
+    celui des deux qui est le plus proche de zéro (ligne fine de 1 pixel, toujours continue)."""
+    pos = D > 0
+    out = np.zeros(D.shape, bool)
+    for ax in (0, 1):
+        a = [slice(None)] * 2
+        b = [slice(None)] * 2
+        a[ax], b[ax] = slice(0, -1), slice(1, None)
+        a, b = tuple(a), tuple(b)
+        flip = pos[a] != pos[b]
+        first = np.abs(D[a]) <= np.abs(D[b])
+        out[a] |= flip & first
+        out[b] |= flip & ~first
+    return out
+
+
+def _contour_field(src, L, auto):
+    """Pour chaque pixel : force du contour (en « contraste » : 1 = noir/blanc) et position du milieu du bord
+    (là où la différence de deux flous change de signe)."""
+    u = src.unit
+    sigma = 0.65 * (4.5 / 0.65) ** (1 - L["detail"] / 100) * u
+    pre = L["smoothing"] / 100 * 2.0 * u
+    key = ("zc", auto, L["useColors"], round(sigma, 3), round(pre, 3))
+
+    def calc():
+        lo, hi = _levels(src, auto)
+        planes = [_stretch(src.rgb[..., i], lo, hi) for i in range(3)] if L["useColors"] else [_gray(src, auto)]
+        total = math.sqrt(sigma * sigma + pre * pre)
+        zc = np.zeros((src.h, src.w), bool)
+        best_e = np.zeros((src.h, src.w), np.float32)
+        for p in planes:
+            base = gauss(p, pre) if pre > 0.3 else p
+            s1 = gauss(base, sigma)
+            D = s1 - gauss(base, sigma * 1.6)
+            gy, gx = np.gradient(s1)
+            e = np.hypot(gx, gy) * (total * 2.5066)                    # ≈ contraste de l'arête
+            # un bord compte pour cette couleur seulement s'il y est assez marqué : on garde le meilleur canal
+            zc |= _sign_change_pixels(D)                               # (tous les canaux placent le trait au même endroit)
+            best_e = np.maximum(best_e, e.astype(np.float32))
+        # un pixel marqué par un canal faible alors qu'un autre est fort reste cohérent : même position du bord
+        return best_e, zc
+    return src.memo(key, calc)
+
+
+def contour_skeleton(src, L, auto, min_len):
+    """Lignes fines (1 pixel) au milieu des bords : continues, sans doublon, sans petits fragments."""
+    e, band = _contour_field(src, L, auto)
+    c_hi = 0.56 * (0.04 / 0.56) ** (L["amount"] / 100)                # sensibilité : curseur « quantité de traits »
+    strong = band & (e > c_hi)
+    weak = band & (e > 0.55 * c_hi)                                    # hystérésis : un trait faible est gardé
+    if not strong.any():                                               # s'il touche un trait fort
+        return np.zeros(e.shape, bool)
+    lab, n = ndi.label(weak, structure=np.ones((3, 3), dtype=bool))
+    keep = np.zeros(n + 1, bool)
+    keep[np.unique(lab[strong])] = True
+    keep[0] = False
+    if min_len > 1:
+        keep &= np.bincount(lab.ravel(), minlength=n + 1) >= min_len
+    return keep[lab]
+
+
+def thick_lines(skel, width_px, u, fluid=40.0):
+    """Donne une épaisseur régulière aux lignes fines, avec des bords lisses (pas de « bulles »).
+    `fluid` (0-100) : plus c'est haut, plus les courbes sont arrondies et les détails voisins fusionnent."""
+    if not skel.any():
+        return np.zeros(skel.shape, np.float32)
+    dist = ndi.distance_transform_edt(~skel).astype(np.float32)
+    cover = np.clip(width_px / 2 - dist + 0.5, 0, 1).astype(np.float32)
+    if fluid <= 0:
+        return cover
+    m = max(width_px, 0.8)                                             # largeur voulue des lignes, en pixels
+    # rayon de lissage : au plus celui demandé, et jamais plus que la moitié de la largeur (sinon la ligne s'étalerait)
+    sg = max(0.7, min((0.8 + fluid / 100 * 2.2) * u, m / 2))
+    sm = gauss(cover, sg)
+    # niveau auquel une ligne de largeur m, floutée de sg, garde exactement sa largeur (profil d'un créneau flouté)
+    t = float(np.clip(0.5 * math.erf(m / (1.41421 * sg)), 0.3, 0.5))
+    gy, gx = np.gradient(sm)
+    return np.clip((sm - t) / (np.hypot(gx, gy) + 1e-4) + 0.5, 0, 1).astype(np.float32)   # bord net sur 1 px
+
+
 def lines_ink(src, L, auto):
     u = src.unit
     if L["style"] == "pencil":
@@ -269,12 +350,13 @@ def hatch_ink(src, tone, S):
         b = (-xx * s + yy * c) / sp
         fa, fb = a - np.floor(a) - 0.5, b - np.floor(b) - 0.5
         dist = np.sqrt(fa * fa + fb * fb) * sp
-        radius = np.sqrt(dark * 0.85 / math.pi) * sp
-        return np.where(dark > 0.02, np.clip(radius - dist + 0.5, 0, 1), 0).astype(np.float32)
+        radius = np.maximum(np.sqrt(dark * 0.85 / math.pi) * sp, max(0.8, 0.45 * u))   # un point reste toujours bien noir
+        return np.where(dark > 0.06, np.clip(radius - dist + 0.5, 0, 1), 0).astype(np.float32)
     offsets = [0, 90, -45, 45]
     n = int(S["layers"])
     for i in range(n):
-        T = top - (top - 0.06) * i / n
+        # la 2e couche (croisée) n'apparaît que dans les zones vraiment sombres : pas de quadrillage partout
+        T = top * (0.55 ** i)
         active = tone < T
         if not active.any():
             break
@@ -283,10 +365,12 @@ def hatch_ink(src, tone, S):
         f = pos - np.floor(pos)
         dist = np.minimum(f, 1 - f) * sp
         if S["variableWidth"]:
-            depth = np.clip((T - tone) / 0.18, 0, 1)
-            half = 0.5 * lw * (0.35 + 0.65 * depth) * 1.25
+            # plus c'est sombre, plus le trait s'épaissit (jusqu'à ~85 % de l'écart) : le dégradé se fait sans quadrillage
+            depth = np.clip((T - tone) / T, 0, 1) ** 1.2
+            half = np.maximum(0.5 * lw, 0.5 * lw + (0.42 * sp - 0.5 * lw) * depth)
         else:
             half = 0.5 * lw
+        half = np.maximum(half, max(0.55, 0.3 * u))                     # jamais trop fin : trait noir franc, à toute taille
         cov = np.clip(half - dist + 0.5, 0, 1)
         out = np.maximum(out, np.where(active, cov, 0).astype(np.float32))
     return out
@@ -310,11 +394,17 @@ def render(src, settings, cancel=None):
         min_area = (s["cleanup"]["size"] / 100) ** 2 * 600 * u * u
 
     if s["lines"]["enabled"]:
-        L = lines_ink(src, s["lines"], auto)
-        check()
-        L = remove_small(L, min_area)
-        check()
-        ink = thicken(L, s["lines"]["thickness"] * u)
+        if s["lines"]["style"] == "pencil":
+            L = lines_ink(src, s["lines"], auto)
+            check()
+            L = remove_small(L, min_area)
+            check()
+            ink = thicken(L, s["lines"]["thickness"] * u)
+        else:
+            min_len = s["cleanup"]["size"] / 100 * 100 * u if s["cleanup"]["enabled"] else 0
+            skel = contour_skeleton(src, s["lines"], auto, min_len)
+            check()
+            ink = thick_lines(skel, max(0.8, 1.6 + 0.8 * s["lines"]["thickness"]) * u, u, s["lines"]["fluid"])
         check()
 
     if s["shading"]["enabled"]:
@@ -331,6 +421,9 @@ def render(src, settings, cancel=None):
         solid = remove_small(solid, min_area)
         ink = np.maximum(ink, solid)
         check()
+    if s["output"]["pure"]:
+        # noir pur : chaque pixel est soit noir, soit blanc (aucun niveau de gris, même sur les bords)
+        ink = (ink > 0.5).astype(np.float32)
     return ink
 
 
